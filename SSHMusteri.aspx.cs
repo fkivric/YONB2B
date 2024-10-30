@@ -10,6 +10,8 @@ using static YONB2B.Class.Siniflar;
 using YONB2B.Class;
 using System.Configuration;
 using System.Drawing.Printing;
+using System.Data;
+using System.Collections;
 
 namespace YONB2B
 {
@@ -42,22 +44,32 @@ namespace YONB2B
                                 magaza = magaza + ",'" + magazalar.Rows[i][0].ToString() + "'";
                             }
                         }
+                        tekmagaza = false;
                     }
                     else
                     {
                         magaza = loginRes[0].DIVVAL.ToString();
                     }
-                    string q = String.Format(@"
-                    select '' as DEPOVAL, 'SEÇİNİZ...' as DEPONAME
-                    union
-                    select DIVVAL,DIVNAME from DIVISON where DIVSTS = 1 and DIVVAL in ({0})", magaza);
-                    var dt = DbQuery.Query(q, ConnectionString);
+                    DataTable dt = new DataTable();
+                    if (tekmagaza)
+                    {
+                        string q = String.Format(@"                        
+                        select DIVVAL as DEPOVAL,DIVNAME as DEPONAME from DIVISON where DIVSTS = 1 and DIVVAL = '{0}'", magaza);
+                        dt = DbQuery.Query(q, ConnectionString);
+                    }
+                    else
+                    {
+                        string q = String.Format(@"
+                        select '' as DEPOVAL, 'SEÇİNİZ...' as DEPONAME
+                        union
+                        select DIVVAL,DIVNAME from DIVISON where DIVSTS = 1 and DIVVAL in ({0})", magaza);
+                        dt = DbQuery.Query(q, ConnectionString);
+                    }
                     Depo.DataSource = dt;
                     Depo.DataValueField = "DEPOVAL";
                     Depo.DataTextField = "DEPONAME";
                     Depo.DataBind();
-                    if (tekmagaza)
-                        Depo.SelectedValue = magaza;
+
                 }
                 else
                 {
@@ -68,149 +80,87 @@ namespace YONB2B
             }
             else
             {
-                // PostBack olduğunda sayfa numarasını al
-                string pageIndexStr = Request["__EVENTARGUMENT"];
-                if (int.TryParse(pageIndexStr, out int pageIndex))
-                {
-                    BindProductData("", pageIndex);
-                }
+
             }
         }
 
-        protected void magaza_SelectedIndexChanged(object sender, EventArgs e)
+
+        protected void Listele_Click(object sender, EventArgs e)
         {
+            bool SearchValue = false;
             if (Depo.SelectedValue != "")
             {
-                string q = String.Format(@"select ORDSALID,CDRCURID,CURVAL,CURNAME,
-                ORDDATE,CDRDATE2,
-                sum(ORDCHBALANCEQUAN) as ORDCHBALANCEQUAN,Convert(numeric(18,2),sum(ORDCHBALANCEQUAN*ORDCHPRICE)) as PRLPRICE,TESLIM.DIVNAME  as TESLIMDIVNAME,SATIS.DIVNAME as SATISDIVNAME,
-                CURCHCOUNTY,
-                DSHIPNAME,DCRWNAME
-                from CUSDELIVER
-                left outer join CUSDELCREW on CDCWCDRID = CDRID
-                left outer join DEFCREW on DCRWVAL = CDCWDCRWVAL
-                left outer join CURRENTS on CURID = CDRCURID
-                left outer join CURRENTSCHILD on CURCHID = CURID
-                left outer join DEFSTORAGE on DSTORID = CDRSTORID
-                left outer join ORDERSCHILD on ORDCHID = CDRORDCHID
-                left outer join ORDERS on ORDID = ORDCHORDID
-                left outer join PRODUCTS on PROID = ORDCHPROID
-                LEFT OUTER JOIN DEFSHIPMENT WITH (NOLOCK) ON DSHIPVAL = CDRSHIPVAL
-                LEFT OUTER JOIN DIVISON TESLIM WITH (NOLOCK) ON TESLIM.DIVVAL = DSTORVAL AND ORDCHCOMPANY = TESLIM.DIVCOMPANY
-                LEFT OUTER JOIN DIVISON SATIS WITH (NOLOCK) ON SATIS.DIVVAL = CDRSALEDIV AND ORDCHCOMPANY = SATIS.DIVCOMPANY
-                WHERE CDRSTS IN (1) 
-                AND ORDERSCHILD.ORDCHBEYOND = 0 
-                AND CUSDELIVER.CDRKIND <> 1 
-                AND CUSDELIVER.CDRRNDSTS = 1 
-                AND CUSDELIVER.CDRSALID > 0 
-                AND ORDCHBALANCEQUAN > 0
-                AND PROPROUID in (103,36)
-                AND (CDRSALEDIV in ({0}) OR DSTORDIVISON in ({0}))
-                group by ORDSALID,CDRCURID,CURVAL,CURNAME,ORDDATE,TESLIM.DIVNAME,SATIS.DIVNAME,DSHIPNAME,CURCHCOUNTY,CDRDATE2,DCRWNAME", magaza);
-                BindProductData();
+                if (Search.Text != "")
+                {
+                    SearchValue = true;
+                }
+                if (TC.Text != "")
+                {
+                    SearchValue = true;
+                }
+                if(SearchValue)
+                {
+                    BindProductData(Search.Text, TC.Text);
+                }
             }
             else
             {
-
+                Liste.Visible=false;
             }
+            
         }
-
         private const int PageSize = 20;
-        private void BindProductData(string search = "", int pageIndex = 1)
+        private void BindProductData(string curname = "", string TC = "", int pageIndex = 1)
         {
             using (SqlConnection conn = new SqlConnection(ConnectionString))
             {
                 conn.Open();
 
                 // İlk olarak toplam kayıt sayısını almak için sorgu
-                string countQuery = String.Format(@"
+                string countQuery = @"
                 SELECT COUNT(*) FROM (
-                    select top 100 ORDSALID,CDRCURID,CURVAL,CURNAME,
-                    ORDDATE,
-                    TESLIMDIVNAME,SATISDIVNAME,
-                    sum(bekleyen) as adet,
-                    DSHIPNAME,DCRWNAME
-                    from (
-                    select distinct CDRID,ORDSALID,CDRCURID,CURVAL,CURNAME,
-                    ORDDATE,
-                    TESLIM.DIVNAME  as TESLIMDIVNAME,SATIS.DIVNAME as SATISDIVNAME,
-                    convert(int,case when ORDCHBALANCEQUAN > 0 then ORDCHBALANCEQUAN else 0 end) as bekleyen,
-                    DSHIPNAME,DCRWNAME
-                    from CURRENTS with (nolock)
-                    left outer join SALES with (nolock) on SALCURID = CURID
-                    left outer join CUSDELIVER with (nolock) on CDRCURID = CURID
-                    left outer join CUSDELCREW with (nolock) on CDCWCDRID = CDRID
-                    left outer join DEFCREW with (nolock) on DCRWVAL = CDCWDCRWVAL
-                    left outer join DEFSTORAGE with (nolock) on DSTORID = CDRSTORID
-                    left outer join ORDERSCHILD with (nolock) on ORDCHID = CDRORDCHID
-                    left outer join ORDERS with (nolock) on ORDID = ORDCHORDID
-                    left outer join PRODUCTS with (nolock) on PROID = ORDCHPROID
-                    LEFT OUTER JOIN DEFSHIPMENT WITH (NOLOCK) ON DSHIPVAL = CDRSHIPVAL
-                    LEFT OUTER JOIN DIVISON TESLIM WITH (NOLOCK) ON TESLIM.DIVVAL = DSTORVAL AND ORDCHCOMPANY = TESLIM.DIVCOMPANY
-                    LEFT OUTER JOIN DIVISON SATIS WITH (NOLOCK) ON SATIS.DIVVAL = CDRSALEDIV AND ORDCHCOMPANY = SATIS.DIVCOMPANY
-                    where 1=1
-                    AND SALDATE >= DATEADD(YEAR,-2,getdate())
-                    AND PROPROUID in (103,36)
-                    AND (CDRSALEDIV = '{0}' OR DSTORDIVISON = '{0}')
-                    AND CURNAME LIKE @search
-                    AND CDRSTS != 3
-                    ) net
-                    group by ORDSALID,CDRCURID,CURVAL,CURNAME,
-                    ORDDATE,
-                    TESLIMDIVNAME,SATISDIVNAME,DSHIPNAME,DCRWNAME
-                ) AS TotalCount 
-                option(fast 100)", Depo.SelectedValue);
+                select CURID,CURVAL,CURNAME,CUSIDTCNO from CURRENTS
+                left outer join CURRENTSCHILD on CURCHID = CURID
+                left outer join CUSIDENTITY ON CUSIDCURID = CURID
+                left outer join DIVISON ON DIVVAL = CURDIVISON
+                where CURSTS = 1 and CURCUSTOMER = 1
+                and CUSIDTCNO = @marka and CURNAME like @search
+                and exists (Select * from SALES s
+			                where not exists (Select * from SALES i where i.SALCANSALID = s.SALID)
+			                and s.SALID > 0
+			                and s.SALCURID = CURID)
+                ) AS TotalCount";
 
                 SqlCommand countCmd = new SqlCommand(countQuery, conn);
-                countCmd.Parameters.AddWithValue("@search", "%" + search + "%");
+                countCmd.Parameters.AddWithValue("@marka", TC);
+                countCmd.Parameters.AddWithValue("@search", "%" + curname + "%");
 
-                int totalCount = 100;// (int)countCmd.ExecuteScalar();
+                int totalCount = (int)countCmd.ExecuteScalar();
                 int totalPages = (int)Math.Ceiling((double)totalCount / PageSize);
-                sayfatoplam.Text = totalPages.ToString() + " / " + pageIndex ;
-
+                sayfatoplam.Text = "Toplam Sayfa :" + totalPages.ToString();
                 // İkinci sorgu: sayfalanmış verileri almak için
-                string query = String.Format(@"
-                SELECT TOP 100 * FROM (
-                    select top 100 ORDSALID,CDRCURID,CURVAL,CURNAME,
-                    ORDDATE,
-                    TESLIMDIVNAME,SATISDIVNAME,
-                    sum(bekleyen) as adet,
-                    DSHIPNAME,DCRWNAME,
-                    ROW_NUMBER() OVER (ORDER BY ORDSALID) AS RowNum
-                    from (
-                    select distinct CDRID,ORDSALID,CDRCURID,CURVAL,CURNAME,
-                    ORDDATE,
-                    TESLIM.DIVNAME  as TESLIMDIVNAME,SATIS.DIVNAME as SATISDIVNAME,
-                    convert(int,case when ORDCHBALANCEQUAN > 0 then ORDCHBALANCEQUAN else 0 end) as bekleyen,
-                    DSHIPNAME,DCRWNAME
-                    from CURRENTS with (nolock)
-                    left outer join SALES with (nolock) on SALCURID = CURID
-                    left outer join CUSDELIVER with (nolock) on CDRCURID = CURID
-                    left outer join CUSDELCREW with (nolock) on CDCWCDRID = CDRID
-                    left outer join DEFCREW with (nolock) on DCRWVAL = CDCWDCRWVAL
-                    left outer join DEFSTORAGE with (nolock) on DSTORID = CDRSTORID
-                    left outer join ORDERSCHILD with (nolock) on ORDCHID = CDRORDCHID
-                    left outer join ORDERS with (nolock) on ORDID = ORDCHORDID
-                    left outer join PRODUCTS with (nolock) on PROID = ORDCHPROID
-                    LEFT OUTER JOIN DEFSHIPMENT WITH (NOLOCK) ON DSHIPVAL = CDRSHIPVAL
-                    LEFT OUTER JOIN DIVISON TESLIM WITH (NOLOCK) ON TESLIM.DIVVAL = DSTORVAL AND ORDCHCOMPANY = TESLIM.DIVCOMPANY
-                    LEFT OUTER JOIN DIVISON SATIS WITH (NOLOCK) ON SATIS.DIVVAL = CDRSALEDIV AND ORDCHCOMPANY = SATIS.DIVCOMPANY
-                    where 1=1
-                    AND SALDATE >= DATEADD(YEAR,-2,getdate())
-                    AND PROPROUID in (103,36)
-                    AND (CDRSALEDIV = '{0}' OR DSTORDIVISON = '{0}')
-                    AND CURNAME Like @search
-                    AND CDRSTS != 3
-                    ) net
-                    group by ORDSALID,CDRCURID,CURVAL,CURNAME,
-                    ORDDATE,
-                    TESLIMDIVNAME,SATISDIVNAME,DSHIPNAME,DCRWNAME
+                string query = @"
+                SELECT * FROM (
+                    SELECT 
+                        CURID,CURVAL,CURNAME,CUSIDTCNO,
+                        ROW_NUMBER() OVER (ORDER BY CURID) AS RowNum
+                    from CURRENTS
+                left outer join CURRENTSCHILD on CURCHID = CURID
+                left outer join CUSIDENTITY ON CUSIDCURID = CURID
+                left outer join DIVISON ON DIVVAL = CURDIVISON
+                where CURSTS = 1 and CURCUSTOMER = 1
+                and CUSIDTCNO = @marka and CURNAME like @search
+                and exists (Select * from SALES s
+			                where not exists (Select * from SALES i where i.SALCANSALID = s.SALID)
+			                and s.SALID > 0
+			                and s.SALCURID = CURID)
                 ) AS Result 
                 WHERE RowNum BETWEEN @start AND @end
-                option(fast 100)", Depo.SelectedValue);
+                order by CURNAME asc";
 
                 SqlCommand cmd = new SqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@search", "%" + search + "%");
+                cmd.Parameters.AddWithValue("@marka", TC);
+                cmd.Parameters.AddWithValue("@search", "%" + curname + "%");
                 cmd.Parameters.AddWithValue("@start", (pageIndex - 1) * PageSize + 1);
                 cmd.Parameters.AddWithValue("@end", pageIndex * PageSize);
 
@@ -231,7 +181,7 @@ namespace YONB2B
             // Önceki sayfa bağlantısı
             if (currentPage > 1)
             {
-                paginationHtml += $"<a href='javascript:void(0);' onclick='__doPostBack(\"{searchInput.UniqueID}\", \"{currentPage - 1}\");'>Önceki</a>";
+                paginationHtml += $"<a href='javascript:void(0);' onclick='__doPostBack(\"{Search.UniqueID}\", \"{currentPage - 1}\");'>Önceki</a>";
             }
 
             // Sayfa numaraları
@@ -243,50 +193,93 @@ namespace YONB2B
                 }
                 else
                 {
-                    paginationHtml += $"<a href='javascript:void(0);' onclick='__doPostBack(\"{searchInput.UniqueID}\", \"{i}\");'>{i}</a>";
+                    paginationHtml += $"<a href='javascript:void(0);' onclick='__doPostBack(\"{Search.UniqueID}\", \"{i}\");'>{i}</a>";
                 }
             }
 
             // Sonraki sayfa bağlantısı
             if (currentPage < totalPages)
             {
-                paginationHtml += $"<a href='javascript:void(0);' onclick='__doPostBack(\"{searchInput.UniqueID}\", \"{currentPage + 1}\");'>Sonraki</a>";
+                paginationHtml += $"<a href='javascript:void(0);' onclick='__doPostBack(\"{Search.UniqueID}\", \"{currentPage + 1}\");'>Sonraki</a>";
             }
 
             paginationHtml += "</div>";
             return paginationHtml;
         }
-
-        //private string GeneratePagination(int totalPages, int currentPage)
-        //{
-        //    string paginationHtml = "";
-        //    for (int i = 1; i <= totalPages; i++)
-        //    {
-        //        if (i == currentPage)
-        //        {
-        //            paginationHtml += $"<a class='active'>{i}</a>";
-        //        }
-        //        else
-        //        {
-        //            paginationHtml += $"<a href='javascript:void(0);' onclick='__doPostBack(\"{searchInput.UniqueID}\", \"{i}\");'>{i}</a>";
-        //        }
-        //    }
-        //    return paginationHtml;
-        //}
-
-        protected void searchInput_TextChanged(object sender, EventArgs e)
+        public static string cuscurid = "";
+        protected void btnOpenModal_Click(object sender, EventArgs e)
         {
-            string searchTerm = searchInput.Value;
-            BindProductData(searchTerm);
-        }
-        protected void Search_TextChanged(object sender, EventArgs e)
-        {
-
+            // Tıklanan butona ait CDRID değerini al
+            Button btn = (Button)sender;
+            string cdrID = btn.CommandArgument;
+            cuscurid = cdrID;
+            BindProductData2(cdrID);
+            ClientScript.RegisterStartupScript(this.GetType(), "OpenModal", "openModal();", true);
         }
 
-        protected void Secim_Click(object sender, EventArgs e)
+        private void BindProductData2(string curid = "")
         {
+            using (SqlConnection conn = new SqlConnection(ConnectionString))
+            {
+                conn.Open();
+                // İkinci sorgu: sayfalanmış verileri almak için
+                string query = @"
+                select PROID,PROVAL,PRONAME
+                from SALES S
+                left outer join INVOICE on SALID = INVSALID
+                left outer join INVOICECHILD on INVCHINVID = INVID
+                left outer join INVOICECHILDPROBH on INVCHPBHID = INVCHID
+                left outer join PRODUCTSBEHAVE on PROBHID = INVCHPBHPROBHID
+                left outer join ORDERS on ORDSALID = SALID
+                left outer join ORDERSCHILD on ORDCHORDID = ORDID
+                left outer join PRODUCTS on PROID = ORDCHPROID or PROID = PROBHPROID
+                where SALCURID = @marka 
+                and PROPROUID in (36,103)
+                and SALAMOUNT > 0
+                and SALID > 0
+                and not exists (select * from SALES i where S.SALID = i.SALCANSALID)";
 
+                SqlCommand cmd = new SqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@marka", curid);
+
+                SqlDataReader reader = cmd.ExecuteReader();
+                Urunler.DataSource = reader;
+                Urunler.DataBind();
+            }
+        }
+        protected void Kapat_Click(object sender, EventArgs e)
+        {
+            ClientScript.RegisterStartupScript(this.GetType(), "closeModal", "closeModal();", true);
+        }
+
+        protected void SALES_RowCreated(object sender, GridViewRowEventArgs e)
+        {
+            e.Row.Cells[1].Visible = false;
+            e.Row.Cells[2].Visible = false;
+        }
+
+        protected void SALES_RowCommand(object sender, GridViewCommandEventArgs e)
+        {
+            ClientScript.RegisterStartupScript(this.GetType(), "closeModal2", "closeModal2();", true);
+            if (e.CommandName == "Select")
+            {
+                int rowIndex = Convert.ToInt32(e.CommandArgument);
+                GridViewRow row = SALES.Rows[rowIndex];
+                string selectedId = row.Cells[0].Text; // ID sütunu
+                hdnSelectedId.Value = selectedId;
+                BindProductData2(selectedId);
+
+                // Popup'ı kapatma ve seçilen değeri ana sayfaya gönderme
+                ClientScript.RegisterStartupScript(this.GetType(), "OpenModal2", "openModal2();", true);
+            }
+        }
+
+        protected void btnOpenModal_Click1(object sender, EventArgs e)
+        {
+            Button btn = (Button)sender;
+            string cdrID = btn.CommandArgument;
+            string url = $"SSHOlusTurma.aspx?proid={Server.UrlEncode(cdrID)}&cuscurid={Server.UrlEncode(cuscurid)}";
+            Response.Redirect(url);
         }
     }
 }

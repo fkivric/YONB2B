@@ -1,14 +1,20 @@
-﻿using System;
+﻿using DG.MiniHTMLTextBox;
+using HtmlAgilityPack;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Reflection.Emit;
 using System.Runtime.Remoting.Metadata.W3cXsd2001;
 using System.Web;
+using System.Web.Services.Description;
 using System.Web.UI;
 using System.Web.UI.WebControls;
+using System.Xml;
 using YONB2B.Class;
 using static YONB2B.Class.Siniflar;
 
@@ -21,12 +27,14 @@ namespace YONB2B
         public static string ConnectionString3 = "Server=192.168.4.12;Database=Yonavm_Web_Siparis;User Id=sa;Password=ebrarsudenur;";
         SqlConnection sql = new SqlConnection(ConnectionString);
         SqlConnection sql2 = new SqlConnection(ConnectionString2);
+        SqlConnection sql3 = new SqlConnection(ConnectionString3);
         static string ftpUrl = "ftp://192.168.4.21/WEBRESIMLER/";
         static string ftpUsername = "admin";
         static string ftpPassword = "Madam1367";
         public static string PROID = "";
         public static string PROVAL = "";
         public static string PRONAME = "";
+        static string WPTREVAL = "";
         static string CURID = "";
         DataTable dosyalar = new DataTable();
         static List<string> files = new List<string>();
@@ -53,7 +61,15 @@ namespace YONB2B
                     txtNewFileName.Text = PRONAME;
                     YONKODU.Text = PROVAL;
                     CURID = DbQuery.GetValue($"select PROSUPCURID from PRODUCTS\r\nleft outer join WAVEPRODUCTS on WPROID = PROID and WPROUNIQ = 1\r\nleft outer join WAVEPROTREE on WPROUNIQ = WPTREUNIQ and WPROVAL = WPTREVAL\r\nleft outer join PROSUPPLIER on PROSUPPROID = PROID\r\nwhere PROID = '{PROID}'");
+                    WPTREVAL = DbQuery.GetValue($"select WPROVAL from WAVEPRODUCTS where WPROID = {PROID} and WPROUNIQ = 1");
+                    var classlar = DbQuery.Query($"SELECT isnull(DetayClass,'') as DetayClass,isnull(TeknikClass,'') as TeknikClass FROM VolantToTicimaxWebClass where Vol_WPTREVAL = '{WPTREVAL}'", ConnectionString3);
+                    txtDetayClass.Text = classlar.Rows[0]["DetayClass"].ToString();
+                    txtTeknikClass.Text = classlar.Rows[0]["TeknikClass"].ToString();
+                    var dtaciklama = DbQuery.Query($"select * from VolantToTicimaxStokAciklamaFirma where VOL_PROID = {PROID}", ConnectionString3);
+                    HtmlToText htt = new HtmlToText();
+                    var plainText = htt.ConvertHtml(dtaciklama.Rows[0]["TicimaxAciklama"].ToString());
 
+                    Aciklama.Text = plainText; //dtaciklama.Rows[0]["TicimaxAciklama"].ToString();
                     files = LoadFtpFiles(CURID);
                     newFiles = LoadFtpFiles(CURID + "/" + PROID);
                     // İlk ListBox'ı güncelle
@@ -267,7 +283,6 @@ namespace YONB2B
                             lblUploadResult.Text = strFileName + " Dosya Kaydedildi";
                             newFiles.Clear();
                             newFiles = LoadFtpFiles(CURID + "/" + PROID);
-                            UpdateListBoxes();
                         }
                         // Delete the local file after upload
                         File.Delete(newFilePath);
@@ -277,6 +292,11 @@ namespace YONB2B
                         lblUploadResult.Text = lblUploadResult.Text + "\r\n" + ex.Message;
                     }
                 }
+
+                files = LoadFtpFiles(CURID);
+                newFiles = LoadFtpFiles(CURID + "/" + PROID);
+                // İlk ListBox'ı güncelle
+                UpdateListBoxes();
             }
             else
             {
@@ -793,9 +813,11 @@ namespace YONB2B
         }
         protected void Kaydet_Click(object sender, EventArgs e)
         {
+            string htmlContent = Request.Form["Aciklama"];
+            var loginRes = (List<LoginObj>)Session["Login"];
             if (txtValue.Text != txtNewFileName.Text)
             {
-                DbQuery.insertquery($"update PRODUCTS set PRONOTES = MDE_GENEL.dbo.CapitalizeWords({txtNewFileName.Text}) where PROID = {PROID}", ConnectionString);
+                DbQuery.insertquery($"update PRODUCTS set PROSUPNAME = MDE_GENEL.dbo.CapitalizeWords({txtNewFileName.Text}) where PROID = {PROID}", ConnectionString);
                 txtNewFileName.ReadOnly = true;
             }
             if (YONKODU.Text != FirmaKodu.Text && FirmaKodu.Text != "")
@@ -867,7 +889,158 @@ namespace YONB2B
             catch (Exception)
             {
             }
-            WebMsgBox.Show("Stok Güncelleme Tamamlandı");
+            if (Aciklama.Text != "" || string.IsNullOrEmpty(Aciklama.Text))
+            {
+                try
+                {
+                    string TicimaxAciklama = "Site URL Adresi = " + txtUrl.Text + Environment.NewLine +" Ürün Açıklaması = "+ Environment.NewLine + Aciklama.Text;
+                    Dictionary<string, string> aciklama = new Dictionary<string, string>();
+                    aciklama.Add("@id", PROID);
+                    aciklama.Add("@aciklama", TicimaxAciklama);
+                    aciklama.Add("@User", loginRes[0].SOCODE);
+                    aciklama.Add("@ReturnDesc", "");
+                    var sonuc = DbQuery.Insert3("StokAciklama", aciklama);
+                    string message = "Açıklama "+sonuc+" İşlem başarılı!";
+                    // JavaScript kodunu oluştur
+                    string script = $@"
+                    <script type='text/javascript'>
+                        $(document).ready(function () {{
+                            $('#modalMessage').val('{message}');
+                            showModal();
+                        }});
+                    </script>";
+
+                    // Scripti sayfaya ekle
+                    ClientScript.RegisterStartupScript(
+                        this.GetType(),
+                        "showModal",
+                        script,
+                        false
+                    );
+                    //lblMessage.Text = message;
+                    //ClientScript.RegisterStartupScript(this.GetType(), "modal", "$('#modalMessage').text('" + message + "'); $('#myModal').modal('show');", true);
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }
+
+        protected void UrlCek_Click(object sender, EventArgs e)
+        {
+            string url = txtUrl.Text;
+
+            // HttpClient kullanarak web sitesine istek gönderiyoruz
+            using (HttpClient httpClient = new HttpClient())
+            {
+                try
+                {
+                    string htmlContent = httpClient.GetStringAsync(url).Result;
+
+                    // HtmlAgilityPack ile HTML içeriğini analiz ediyoruz
+                    HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
+                    doc.LoadHtml(htmlContent);
+
+                    if (txtTeknikClass.Text != "")
+                    {
+                        // Hedef class adı
+                        string TeknikClass = txtTeknikClass.Text;
+
+                        // Belirli bir class adını içeren HTML elementlerini seçiyoruz
+                        HtmlNodeCollection nodes = doc.DocumentNode.SelectNodes($"//*[contains(@class, '{TeknikClass}')]");
+                        Aciklama.Text = "";
+                        if (nodes != null)
+                        {
+                            foreach (HtmlNode node in nodes)
+                            {
+                                // Seçilen elementleri burada işleyebilirsiniz
+                                Aciklama.Text += node.OuterHtml;
+                                //Console.WriteLine(node.OuterHtml);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"'{TeknikClass}' sınıfı içeren element bulunamadı.");
+                        }
+                    }
+                    if (txtDetayClass.Text != "")
+                    {
+                        string DetayClass = txtDetayClass.Text;
+
+                        // Belirli bir class adını içeren HTML elementlerini seçiyoruz
+                        HtmlNodeCollection nodes2 = doc.DocumentNode.SelectNodes($"//*[contains(@class, '{DetayClass}')]");
+                        if (nodes2 != null)
+                        {
+                            if (nodes2.Count >= 3)
+                            {
+                                HashSet<string> nodeler = new HashSet<string>();
+                                foreach (HtmlNode node in nodes2)
+                                {
+                                    if (nodeler.Add(node.OuterHtml))
+                                    {
+                                        Aciklama.Text += node.OuterHtml;
+                                    }
+                                    // Seçilen elementleri burada işleyebilirsiniz
+                                    //Console.WriteLine(node.OuterHtml);
+
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"'{DetayClass}' sınıfı içeren element bulunamadı.");
+                        }
+                    }
+                    DbQuery.insertquery(String.Format("update VolantToTicimaxWebClass set DetayClass = '{0}',TeknikClass = '{2}' where Vol_WPTREVAL = '{1}'", txtDetayClass.Text, WPTREVAL, txtTeknikClass.Text),ConnectionString3);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Hata oluştu: {ex.Message}");
+                }
+            }
+            List<string> imageLinks = GetImageLinksFromUrl(url);
+
+
+            foreach (string link in imageLinks)
+            {
+                Console.WriteLine(link);
+            }
+        }
+        static List<string> GetImageLinksFromUrl(string url)
+        {
+            List<string> imageLinks = new List<string>();
+
+            try
+            {
+                HtmlWeb web = new HtmlWeb();
+                HtmlAgilityPack.HtmlDocument doc = web.Load(url);
+
+                foreach (HtmlNode imgNode in doc.DocumentNode.SelectNodes("//img[@src]"))
+                {
+                    string src = imgNode.GetAttributeValue("src", "");
+                    if (!string.IsNullOrEmpty(src))
+                    {
+                        if (Uri.IsWellFormedUriString(src, UriKind.Absolute))
+                        {
+                            imageLinks.Add(src);
+                        }
+                        else if (Uri.TryCreate(new Uri(url), src, out Uri absoluteUri))
+                        {
+                            imageLinks.Add(absoluteUri.ToString());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Hata: " + ex.Message);
+            }
+
+            return imageLinks;
+        }
+
+        protected void Kapat_Click(object sender, EventArgs e)
+        {
             Response.Redirect("StokIslemleri.aspx");
         }
     }

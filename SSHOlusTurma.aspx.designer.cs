@@ -42,6 +42,15 @@ namespace YONB2B
         protected global::System.Web.UI.WebControls.DropDownList Depo;
 
         /// <summary>
+        /// Musteri denetimi.
+        /// </summary>
+        /// <remarks>
+        /// Otomatik olarak oluşturulan alan.
+        /// Değiştirmek için, alan bildirimini tasarımcı dosyasından arka plan kod dosyasına taşıyın.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.TextBox Musteri;
+
+        /// <summary>
         /// Firma denetimi.
         /// </summary>
         /// <remarks>
@@ -184,15 +193,6 @@ namespace YONB2B
         /// Değiştirmek için, alan bildirimini tasarımcı dosyasından arka plan kod dosyasına taşıyın.
         /// </remarks>
         protected global::System.Web.UI.WebControls.GridView SSHFAULTS;
-
-        /// <summary>
-        /// hdnSelectedId denetimi.
-        /// </summary>
-        /// <remarks>
-        /// Otomatik olarak oluşturulan alan.
-        /// Değiştirmek için, alan bildirimini tasarımcı dosyasından arka plan kod dosyasına taşıyın.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.HiddenField hdnSelectedId;
 
         /// <summary>
         /// Kapat denetimi.

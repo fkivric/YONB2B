@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
@@ -35,7 +36,20 @@ namespace YONB2B
                     }
                     else
                     {
-                        userfirma.InnerText = DbQuery.GetValue($"select CURNAME from CURRENTS  where CURVAL = '{loginRes[0].CURVAL}'");
+                        string fullName = DbQuery.GetValue($"select CURNAME from CURRENTS  where CURVAL = '{loginRes[0].CURVAL}'");
+                        int maxLineLength = 20;
+
+                        // StringBuilder ile yeni satır ekleme
+                        StringBuilder formattedName = new StringBuilder();
+                        for (int i = 0; i < fullName.Length; i += maxLineLength)
+                        {
+                            // Mevcut satırı almak için kalan karakter sayısını kontrol et
+                            int length = Math.Min(maxLineLength, fullName.Length - i);
+                            formattedName.AppendLine(fullName.Substring(i, length));
+                        }
+
+                        // Sonucu h6 etiketine yaz
+                        userfirma.InnerHtml = formattedName.ToString().Replace(Environment.NewLine, "<br />");
                         Yon0.Visible = false;
                         Yon1.Visible = false;
                         Yon2.Visible = false;

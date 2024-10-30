@@ -12,13 +12,14 @@ namespace YONB2B.Class
     {
         public static string ConnectionString = "Server=192.168.4.24;Database=VDB_YON01;User Id=sa;Password=MagicUser2023!;";
         public static string ConnectionString2 = "Server=192.168.4.24;Database=MDE_GENEL;User Id=sa;Password=MagicUser2023!;";
+        public static string ConnectionString3 = "Server=192.168.4.12;Database=Yonavm_Web_Siparis;User Id=sa;Password=ebrarsudenur;";
         public static DataTable Query(string Sorgu, string Connection)
         {
             DataTable dt = new DataTable();
             SqlConnection conn = new SqlConnection(Connection);
-            SqlDataAdapter da = new SqlDataAdapter(Sorgu, conn);
+            SqlDataAdapter da = new  SqlDataAdapter(Sorgu, conn);
             da.Fill(dt);
-            if (dt.Rows.Count > 0)
+            if (dt.Rows.Count > 0) 
             {
                 return dt;
             }
@@ -68,6 +69,37 @@ namespace YONB2B.Class
         public static string Insert2(string spName, Dictionary<string, string> param)
         {
             using (SqlConnection conn = new SqlConnection(ConnectionString2))
+            {
+                conn.Open();
+                using (SqlCommand cmd = new SqlCommand(spName, conn))
+                {
+                    cmd.CommandTimeout = 0;
+                    if (param != null)
+                    {
+                        foreach (var item in param)
+                        {
+                            if (item.Key == "@ReturnDesc")
+                            {
+                                cmd.Parameters.Add("@ReturnDesc", SqlDbType.VarChar, 500).Direction = ParameterDirection.Output;
+                            }
+                            else
+                            {
+                                cmd.Parameters.AddWithValue(item.Key, item.Value);
+                            }
+                        }
+                    }
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.ExecuteNonQuery();
+
+                    return (string)cmd.Parameters["@ReturnDesc"].Value;
+                }
+            }
+
+        }
+        public static string Insert3(string spName, Dictionary<string, string> param)
+        {
+            using (SqlConnection conn = new SqlConnection(ConnectionString3))
             {
                 conn.Open();
                 using (SqlCommand cmd = new SqlCommand(spName, conn))

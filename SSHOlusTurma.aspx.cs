@@ -26,25 +26,39 @@ namespace YONB2B
         public static string PROVAL = "";
         public static string PRONAME = "";
         static string CURID = "";
+        static string CUSCURID = "";
         DataTable dosyalar = new DataTable();
         static List<string> files = new List<string>();
         static List<string> newFiles = new List<string>();
         protected void Page_Load(object sender, EventArgs e)
         {
-            PROID = Request.QueryString["proid"];
-            PROVAL = Request.QueryString["proval"];
-            PRONAME = Request.QueryString["proname"];
-            Stokkodu.InnerText = PROVAL + " :";
-            Stokadi.InnerText = PRONAME;
             if (!IsPostBack)
             {
                 var loginRes = (List<LoginObj>)Session["Login"];
                 if (loginRes != null)
                 {
+                    PROID = Request.QueryString["proid"];
+                    string q = String.Format(@"select PROVAL,PRONAME from PRODUCTS where PROID = {0}", PROID);
+                    var dt = DbQuery.Query(q, ConnectionString);
+                    PROVAL = dt.Rows[0]["PROVAL"].ToString();//Request.QueryString["proval"];
+                    PRONAME = dt.Rows[0]["PRONAME"].ToString();//Request.QueryString["proname"];
+                    CUSCURID = Request.QueryString["cuscurid"];
+                    Stokkodu.InnerText = PROVAL + " :";
+                    Stokadi.InnerText = PRONAME;
                     sorgu1();
                     customerDATE.Value = DateTime.Now.ToString("yyyy-MM-dd");
                     tedarikci(PROID);
                     BindGrid();
+                    if (CUSCURID.Length > 2)
+                    {
+                        var Dp = DbQuery.Query($"select CURVAL,CURNAME from CURRENTS where CURID = '{CUSCURID}'", ConnectionString);
+                        Musteri.Text = Dp.Rows[0]["CURVAL"].ToString() + Environment.NewLine + Dp.Rows[0]["CURNAME"].ToString();
+                    }
+                    else
+                    {
+                        var Dp = DbQuery.Query($"select DIVVAL,DIVNAME from DIVISON where DIVVAL = '{CUSCURID}'",ConnectionString);
+                        Musteri.Text = Dp.Rows[0]["DIVVAL"].ToString() + Environment.NewLine + Dp.Rows[0]["DIVNAME"].ToString();
+                    }
                 }
                 else
                 {
@@ -329,8 +343,11 @@ namespace YONB2B
 
         protected void SSHTuru_SelectedIndexChanged(object sender, EventArgs e)
         {
-            BindGrid(SSHTuru.SelectedValue);
-            ClientScript.RegisterStartupScript(this.GetType(), "OpenModal", "openModal();", true);
+            if (SSHTuru.SelectedValue != "")
+            {
+                BindGrid(SSHTuru.SelectedValue);
+                ClientScript.RegisterStartupScript(this.GetType(), "OpenModal", "openModal();", true);
+            }
         }
 
         private void BindGrid(string filter = "")
@@ -372,8 +389,6 @@ namespace YONB2B
                 int rowIndex = Convert.ToInt32(e.CommandArgument);
                 GridViewRow row = SSHFAULTS.Rows[rowIndex];
                 string selectedId = row.Cells[0].Text; // ID sütunu
-                hdnSelectedId.Value = selectedId;
-
                 // Popup'ı kapatma ve seçilen değeri ana sayfaya gönderme
                 ClientScript.RegisterStartupScript(this.GetType(), "closeModal", "closeModal();", true);
             }
@@ -386,13 +401,7 @@ namespace YONB2B
 
         protected void Kapat_Click(object sender, EventArgs e)
         {
-            ClientScript.RegisterStartupScript(
-                this.GetType(),
-                "HideModal",
-                "HideModal();",
-                false
-            );
-
+            ClientScript.RegisterStartupScript(this.GetType(), "closeModal", "closeModal();", true);
         }
     }
 }
