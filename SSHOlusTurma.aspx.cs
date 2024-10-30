@@ -58,6 +58,7 @@ namespace YONB2B
                     {
                         var Dp = DbQuery.Query($"select DIVVAL,DIVNAME from DIVISON where DIVVAL = '{CUSCURID}'",ConnectionString);
                         Musteri.Text = Dp.Rows[0]["DIVVAL"].ToString() + Environment.NewLine + Dp.Rows[0]["DIVNAME"].ToString();
+                        Depo.SelectedValue = CUSCURID;
                     }
                 }
                 else
