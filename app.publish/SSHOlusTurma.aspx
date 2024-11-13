@@ -222,12 +222,12 @@
         <div class="row">
             <div class="col-md-12">
                 <div class="card">
-                    <div class="card-header text">
-                        <span runat="server" id="Stokkodu">Stok Kodu</span>
-                        <span runat="server" id="Stokadi">Stok Adı</span>
+                    <div class="card-header text text-center">
+                        <h2><span runat="server" id="Stokkodu">Stok Kodu</span>
+                        <span runat="server" id="Stokadi">Stok Adı</span></h2>
                     </div>
                     <div class="row m-0 row-group text-center border-top border-light-3">
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-3">
                             <div class="p-3">
                                 <label class="form-label" for="Depo">İşlem Mağazası</label>
                                 <br />
@@ -235,7 +235,14 @@
                                 </asp:DropDownList>
                             </div>
                         </div>
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-3">
+                            <div class="p-3">
+                                <label class="form-label" for="Musteri">Müşteri Bilgisi</label>
+                                <br />
+                                <asp:TextBox runat="server" ID="Musteri" class="form-select form-control color-dropdown" TextMode="MultiLine" Rows="2"></asp:TextBox>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-3">
                             <div class="p-3">
                                 <label class="form-label" for="Firma">Tedarikci Firma Adı:</label>
                                 <br />
@@ -243,15 +250,11 @@
                                 </asp:DropDownList>
                             </div>
                         </div>
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-3">
                             <div class="p-3">
-                                <label class="form-label" for="Tarih">İşlem Tarihi</label>
-                                <br />
-
-                                <input class="col-md-4" type="date" id="customerDATE" runat="server" />
-                                <%--                                    <asp:TextBox ID="txtDate" runat="server"></asp:TextBox>
-                                     <a href="javascript:OpenPopupPage('Calendar.aspx','<%= txtDate.ClientID %>','<%= Page.IsPostBack %>');">--%>
-                                <img src="assets/images/icon-calendar.gif" />
+                                <label class="form-label" for="customerDATE">İşlem Tarihi</label>
+                                <br>
+                                <input class="col-md-6" type="date" id="customerDATE" runat="server" />
                             </div>
                         </div>
                     </div>
@@ -261,6 +264,7 @@
                                 <label class="form-label" for="SSHTuru">Hata Kodu</label>
                                 <br />
                                 <asp:DropDownList runat="server" ID="SSHTuru" class="form-select form-control color-dropdown" OnSelectedIndexChanged="SSHTuru_SelectedIndexChanged" AutoPostBack="true">
+                                    <asp:ListItem Value="" Text="Seçiniz.."></asp:ListItem>
                                     <asp:ListItem Value="Parça Arızası" Text="Parça Arızası"></asp:ListItem>
                                     <asp:ListItem Value="Ürün Eksiği" Text="Ürün Eksiği"></asp:ListItem>
                                 </asp:DropDownList>
@@ -336,12 +340,17 @@
                         </div>
                     </div>
                 </div>
-                <div class="row">
-                    <asp:Button runat="server" ID="Kaydet" CssClass="btn btn-success form-control" Text="Kaydet" OnClick="Kaydet_Click" Visible="false" />
+                <div class="card">
+                    <div class="row m-0 row-group text-center border-top border-light-3">
+                        <div class="col-12 col-lg-6">
+                            <div class="p-3">
+                                <asp:Button runat="server" ID="Kaydet" CssClass="btn btn-success form-control" Text="Kaydet" OnClick="Kaydet_Click" Visible="false" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
         <div id="myModal" class="modal">
             <h5>Aranacak Kelime</h5>
             <div class="modal-content">
@@ -373,7 +382,6 @@
                                 <asp:BoundField ItemStyle-CssClass="td1" DataField="SFAULNAME" HeaderText="PROBLEM" ItemStyle-VerticalAlign="Middle" ItemStyle-HorizontalAlign="Center" />
                             </Columns>
                         </asp:GridView>
-                        <asp:HiddenField ID="hdnSelectedId" runat="server" />
                     </div>
                     <div class="row gx-3 gy-2 align-items-center form-group text-center">
                         <asp:Button runat="server" ID="Kapat" CssClass="btn btn-outline-danger" Width="100%" Text="Kapat" OnClick="Kapat_Click" />

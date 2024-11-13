@@ -63,13 +63,19 @@ namespace YONB2B
                     CURID = DbQuery.GetValue($"select PROSUPCURID from PRODUCTS\r\nleft outer join WAVEPRODUCTS on WPROID = PROID and WPROUNIQ = 1\r\nleft outer join WAVEPROTREE on WPROUNIQ = WPTREUNIQ and WPROVAL = WPTREVAL\r\nleft outer join PROSUPPLIER on PROSUPPROID = PROID\r\nwhere PROID = '{PROID}'");
                     WPTREVAL = DbQuery.GetValue($"select WPROVAL from WAVEPRODUCTS where WPROID = {PROID} and WPROUNIQ = 1");
                     var classlar = DbQuery.Query($"SELECT isnull(DetayClass,'') as DetayClass,isnull(TeknikClass,'') as TeknikClass FROM VolantToTicimaxWebClass where Vol_WPTREVAL = '{WPTREVAL}'", ConnectionString3);
-                    txtDetayClass.Text = classlar.Rows[0]["DetayClass"].ToString();
-                    txtTeknikClass.Text = classlar.Rows[0]["TeknikClass"].ToString();
+                    if (classlar != null)
+                    {
+                        txtDetayClass.Text = classlar.Rows[0]["DetayClass"].ToString();
+                        txtTeknikClass.Text = classlar.Rows[0]["TeknikClass"].ToString();
+                    }
                     var dtaciklama = DbQuery.Query($"select * from VolantToTicimaxStokAciklamaFirma where VOL_PROID = {PROID}", ConnectionString3);
-                    HtmlToText htt = new HtmlToText();
-                    var plainText = htt.ConvertHtml(dtaciklama.Rows[0]["TicimaxAciklama"].ToString());
+                    if (dtaciklama != null)
+                    {
+                        HtmlToText htt = new HtmlToText();
+                        var plainText = htt.ConvertHtml(dtaciklama.Rows[0]["TicimaxAciklama"].ToString());
 
-                    Aciklama.Text = plainText; //dtaciklama.Rows[0]["TicimaxAciklama"].ToString();
+                        Aciklama.Text = plainText; //dtaciklama.Rows[0]["TicimaxAciklama"].ToString();
+                    }
                     files = LoadFtpFiles(CURID);
                     newFiles = LoadFtpFiles(CURID + "/" + PROID);
                     // İlk ListBox'ı güncelle
